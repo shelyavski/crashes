@@ -1,0 +1,36 @@
+version: '3.7'
+
+services:
+  clickhouse:
+    image: yandex/clickhouse-server
+    hostname: clickhouse
+    container_name: clickhouse
+    ports:
+        - 9000:9000
+        - 8123:8123
+    volumes:
+            - ./config/clickhouse_config.xml:/etc/clickhouse-server/config.xml
+            - ./config/clickhouse_metrika.xml:/etc/clickhouse-server/metrika.xml
+            - ./config/macros/macros-01.xml:/etc/clickhouse-server/config.d/macros.xml
+            - ./config/users.xml:/etc/clickhouse-server/users.xml
+            # - ./data/server-01:/var/lib/clickhouse
+    ulimits:
+        nofile:
+            soft: 262144
+            hard: 262144
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    hostname: metabase
+    ports:
+      - 3123:3000
+    healthcheck:
+      test: curl --fail -I http://localhost:3000/api/health || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+
+networks:
+  default:
+    name: meta_click
