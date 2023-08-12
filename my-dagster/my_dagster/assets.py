@@ -6,13 +6,12 @@ from dotenv import load_dotenv
 
 from dagster import (
     MetadataValue,
-    AssetExecutionContext,
+    Output,
     asset,
 )
-# TODO: Add metadata to all assets
 
 @asset
-def get_records_as_df(context: AssetExecutionContext) -> pd.DataFrame:
+def get_records_as_df() -> Output[pd.DataFrame]:
     # Get environment variables from the .env file
     load_dotenv(dotenv_path='../.env')
 
@@ -36,28 +35,30 @@ def get_records_as_df(context: AssetExecutionContext) -> pd.DataFrame:
     # Transform to data frame
     df = pd.DataFrame.from_records(records)
 
-    # Metadata fo Dagster
-    context.add_output_metadata(
-        metadata={
+    return Output(df, metadata={
             "num_records": len(df),
             "preview": MetadataValue.md(df.head().to_markdown()),
-        }
-    )
-
-    return df
+        })
 
 
 @asset
-def split_violation_categories(get_records_as_df: pd.DataFrame) -> pd.DataFrame:
+def split_violation_categories(get_records_as_df: pd.DataFrame) -> Output[pd.DataFrame]:
     df = get_records_as_df
+
+    # Some values in violation and violation_status have sub-values, that are separated by a dash.
+    # We're splitting them for easier reporting. Examples: 'NO PARKING-STREET CLEANING'
     df[['violation', 'sub-violation']] = df['violation'].str.split('-', expand=True)
     df[['violation_status', 'sub-violation_status']] = df['violation_status'].str.split('-', expand=True)
 
-    return df
+    return Output(df, metadata={
+            "num_records": len(df),
+            "df_columns": df.columns,
+            "preview": MetadataValue.md(df.head().to_markdown()),
+        })
 
 
 @asset
-def fill_empty_values(split_violation_categories: pd.DataFrame) -> pd.DataFrame:
+def fill_empty_values(split_violation_categories: pd.DataFrame) -> Output[pd.DataFrame]:
     columns_with_empty_values = (
         'sub-violation',
         'violation_status',
@@ -71,10 +72,14 @@ def fill_empty_values(split_violation_categories: pd.DataFrame) -> pd.DataFrame:
     # Using 01/01/1970 instead of NaN in Clickhouse Date fields
     df['judgment_entry_date'] = df['judgment_entry_date'].fillna('01/01/1970')
 
-    return df
+    return Output(df, metadata={
+            "num_records": len(df),
+            "empty_values_per_column": df.isna().sum(),
+            "preview": MetadataValue.md(df.head().to_markdown()),
+        })
 
 
-@asset
-def persist_in_clickhouse(fill_empty_values: pd.DataFrame) -> None:
-    x = fill_empty_values
-    pass
+# @asset
+# def persist_in_clickhouse(fill_empty_values: pd.DataFrame) -> None:
+#     x = fill_empty_values
+#     pass
