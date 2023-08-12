@@ -3,14 +3,21 @@ import pandas as pd
 
 from sodapy import Socrata
 from dotenv import load_dotenv
+from datetime import date,timedelta
 
 from dagster import (
     MetadataValue,
     Output,
+    RetryPolicy,
     asset,
 )
 
-@asset
+# TODO: Add validations: https://docs.dagster.io/integrations/pandas
+
+
+@asset(retry_policy=RetryPolicy(
+    max_retries=3,
+    delay=5))
 def get_records_as_df() -> Output[pd.DataFrame]:
     # Get environment variables from the .env file
     load_dotenv(dotenv_path='../.env')
@@ -23,14 +30,16 @@ def get_records_as_df() -> Output[pd.DataFrame]:
         password=os.environ['PASS']
     )
 
+    yesterday = (date.today() - timedelta(days=1)).strftime('%m/%d/%Y')
+
     # Query the API
     try:
         records = client.get(
             dataset_identifier="nc67-uf89",
-            where="issue_date = '08/07/2023'"  # TODO: Make dynamic
+            where=f"issue_date = '{yesterday}'"
         )
-    except Exception:  # TODO: Place specific exception
-        raise Exception('')
+    except ConnectionError:
+        raise ConnectionError
 
     # Transform to data frame
     df = pd.DataFrame.from_records(records)
@@ -52,7 +61,7 @@ def split_violation_categories(get_records_as_df: pd.DataFrame) -> Output[pd.Dat
 
     return Output(df, metadata={
             "num_records": len(df),
-            "df_columns": df.columns,
+            "df_columns": MetadataValue.md((df.dtypes.to_markdown())),
             "preview": MetadataValue.md(df.head().to_markdown()),
         })
 
@@ -60,10 +69,20 @@ def split_violation_categories(get_records_as_df: pd.DataFrame) -> Output[pd.Dat
 @asset
 def fill_empty_values(split_violation_categories: pd.DataFrame) -> Output[pd.DataFrame]:
     columns_with_empty_values = (
-        'sub-violation',
-        'violation_status',
-        'sub-violation_status',
+        "plate",
+        "state",
+        "license_type",
+        "summons_number",
+        "violation",
+        "precinct",
+        "county",
+        "issuing_agency",
+        "violation_status",
+        "summons_image",
+        "sub-violation",
+        "sub-violation_status"
     )
+
     df = split_violation_categories
 
     for column in columns_with_empty_values:
@@ -74,9 +93,10 @@ def fill_empty_values(split_violation_categories: pd.DataFrame) -> Output[pd.Dat
 
     return Output(df, metadata={
             "num_records": len(df),
-            "empty_values_per_column": df.isna().sum(),
+            "empty_values_per_column": MetadataValue.md((df.isna().sum().to_markdown())),
             "preview": MetadataValue.md(df.head().to_markdown()),
-        })
+        }
+    )
 
 
 # @asset
