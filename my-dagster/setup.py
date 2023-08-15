@@ -8,7 +8,8 @@ setup(
         "dagster-cloud",
         "pandas",
         "sodapy",
-        "python-dotenv"
+        "python-dotenv",
+        "pyarrow"
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )

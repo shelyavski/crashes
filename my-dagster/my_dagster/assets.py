@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 from datetime import date, timedelta
 from sodapy import Socrata
@@ -11,7 +12,7 @@ from dagster import (
 )
 
 
-# TODO: Add validations: https://docs.dagster.io/integrations/pandas
+# TODO: Add custom validation types: https://docs.dagster.io/integrations/pandas
 
 
 @asset(retry_policy=RetryPolicy(
@@ -32,60 +33,89 @@ def get_records_as_df(socrata_client: ResourceParam[Socrata]) -> Output[pd.DataF
         raise ConnectionError
 
     # Transform to data frame
-    df = pd.DataFrame.from_records(records)
+    df = pd.DataFrame.from_records(data=records)
+
+    df['violation_time'] = df['violation_time'] + 'M'  # So that we get AM and PM instead of A and P
 
     return Output(
         df,
         metadata={
             "num_records": len(df),
+            "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
             "preview": MetadataValue.md(df.head().to_markdown()),
         }
     )
 
 
 @asset
-def split_violation_categories(get_records_as_df: pd.DataFrame) -> Output[pd.DataFrame]:
+def validate_columns_and_types(
+        get_records_as_df: pd.DataFrame,
+        raw_column_dtypes: ResourceParam[dict],
+        default_column_values: ResourceParam[dict],
+) -> Output[pd.DataFrame]:
     df = get_records_as_df
+
+    # Check if all columns are
+    actual_columns = df.columns.values.tolist()
+    missing_columns = [col_name for col_name in raw_column_dtypes.keys() if col_name not in actual_columns]
+
+    # Add missing columns and fill with default value
+    if missing_columns:
+        for col_name in missing_columns:
+            df[col_name] = df.apply(lambda _: default_column_values[col_name], axis=1)
+
+    # Return with correct dtypes
+    return Output(
+        df.astype(dtype=raw_column_dtypes),
+        metadata={
+            "num_records": len(df),
+            "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
+            "preview": MetadataValue.md(df.head().to_markdown()),
+        }
+    )
+
+
+@asset
+def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Output[pd.DataFrame]:
+    df = validate_columns_and_types
 
     # Some values in violation and violation_status have sub-values, that are separated by a dash.
     # We're splitting them for easier reporting. Examples: 'NO PARKING-STREET CLEANING'
-    df[["violation", "sub-violation"]] = df["violation"].str.split("-", expand=True)
-    df[["violation_status", "sub-violation_status"]] = df["violation_status"].str.split("-", expand=True)
+    df[['violation', 'sub-violation']] = (pd.Series(
+        np.where(
+            df['violation'].str.contains('-'),
+            df['violation'],
+            df['violation'] + '-Not specified'
+        )
+    )).str.split('-', n=1, expand=True)
+
+    df[['violation_status', 'sub-violation_status']] = (pd.Series(
+        np.where(
+            df['violation_status'].str.contains('-'),
+            df['violation_status'],
+            df['violation_status'] + '-Not specified'
+        )
+    )).str.split('-', n=1, expand=True)
 
     return Output(
         df,
         metadata={
             "num_records": len(df),
-            "df_columns": MetadataValue.md((df.dtypes.to_markdown())),
+            "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
             "preview": MetadataValue.md(df.head().to_markdown()),
         }
     )
 
 
 @asset
-def fill_empty_values(split_violation_categories: pd.DataFrame) -> Output[pd.DataFrame]:
-    columns_with_empty_values = (  # TODO: Replace hardcoded values with dynamic.
-        "plate",
-        "state",
-        "license_type",
-        "summons_number",
-        "violation",
-        "precinct",
-        "county",
-        "issuing_agency",
-        "violation_status",
-        "summons_image",
-        "sub-violation",
-        "sub-violation_status"
-    )
+def fill_empty_values(split_violation_categories: pd.DataFrame,
+                      default_column_values: ResourceParam[dict],
+                      ) -> Output[pd.DataFrame]:
 
     df = split_violation_categories
 
-    for column in columns_with_empty_values:
-        df[column] = df[column].fillna("Not specified")
-
-    # Using 01/01/1970 instead of NaN in Clickhouse Date fields
-    df["judgment_entry_date"] = df["judgment_entry_date"].fillna("01/01/1970")
+    for column in df.columns:
+        df[column] = df[column].fillna(default_column_values[column])
 
     return Output(
         df,
@@ -95,8 +125,3 @@ def fill_empty_values(split_violation_categories: pd.DataFrame) -> Output[pd.Dat
             "preview": MetadataValue.md(df.head().to_markdown()),
         }
     )
-
-# @asset
-# def persist_in_clickhouse(fill_empty_values: pd.DataFrame) -> None:
-#     x = fill_empty_values
-#     pass

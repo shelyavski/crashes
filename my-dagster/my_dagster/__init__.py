@@ -21,5 +21,7 @@ defs = Definitions(
     schedules=[parking_violations_schedule],
     resources={
         "socrata_client": resources.socrata_client,
+        "raw_column_dtypes": resources.raw_column_dtypes,
+        "default_column_values": resources.default_column_values,
     },
 )

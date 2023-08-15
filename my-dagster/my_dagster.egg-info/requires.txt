@@ -3,6 +3,7 @@ dagster-cloud
 pandas
 sodapy
 python-dotenv
+pyarrow
 
 [dev]
 dagster-webserver
