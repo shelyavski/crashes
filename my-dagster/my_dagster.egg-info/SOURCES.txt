@@ -4,6 +4,7 @@ setup.cfg
 setup.py
 my_dagster/__init__.py
 my_dagster/assets.py
+my_dagster/dataframe_types.py
 my_dagster/resources.py
 my_dagster/testingg.py
 my_dagster.egg-info/PKG-INFO
