@@ -97,6 +97,14 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Outp
         )
     )).str.split('-', n=1, expand=True)
 
+    df[['violation',
+        'sub-violation',
+        'violation_status',
+        'sub-violation_status']] = df[['violation',
+                                       'sub-violation',
+                                       'violation_status',
+                                       'sub-violation_status']].astype(dtype='string[pyarrow]')
+
     return Output(
         df,
         metadata={
@@ -111,7 +119,6 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Outp
 def fill_empty_values(split_violation_categories: pd.DataFrame,
                       default_column_values: ResourceParam[dict],
                       ) -> Output[pd.DataFrame]:
-
     df = split_violation_categories
 
     for column in df.columns:
