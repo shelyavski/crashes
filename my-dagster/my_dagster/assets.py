@@ -1,8 +1,10 @@
+import clickhouse_connect.driver.httpclient
 import pandas as pd
 import numpy as np
 
 from datetime import date, timedelta
 from sodapy import Socrata
+from clickhouse_connect.driver.httpclient import Client as ClickhouseClient
 from dagster import (
     MetadataValue,
     Output,
@@ -12,6 +14,10 @@ from dagster import (
 )
 
 from .dataframe_types import CleanedCameraViolationsDataframe
+
+
+# TODO: In summons_image column only leave the actual url as a string
+# TODO: Separate hour and minute in different fields so that 04:47PM -> hour: 16, minute: 47
 
 
 @asset(retry_policy=RetryPolicy(
@@ -65,7 +71,7 @@ def validate_columns_and_types(
 
     # Return with correct dtypes
     return Output(
-        df.astype(dtype=raw_column_dtypes),
+        df,
         metadata={
             "num_records": len(df),
             "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
@@ -75,12 +81,15 @@ def validate_columns_and_types(
 
 
 @asset
-def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Output[pd.DataFrame]:
+def split_violation_categories(validate_columns_and_types: pd.DataFrame,
+                               raw_column_dtypes: ResourceParam[dict]
+                               ) -> Output[pd.DataFrame]:
     df = validate_columns_and_types
+    df[['violation', 'violation_status']].fillna("Not specified")
 
-    # Some values in violation and violation_status have sub-values, that are separated by a dash.
+    # Some values in violation and violation_status have sub_values, that are separated by a dash.
     # We're splitting them for easier reporting. Examples: 'NO PARKING-STREET CLEANING'
-    df[['violation', 'sub-violation']] = (pd.Series(
+    df[['violation', 'sub_violation']] = (pd.Series(
         np.where(
             df['violation'].str.contains('-'),
             df['violation'],
@@ -88,7 +97,7 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Outp
         )
     )).str.split('-', n=1, expand=True)
 
-    df[['violation_status', 'sub-violation_status']] = (pd.Series(
+    df[['violation_status', 'sub_violation_status']] = (pd.Series(
         np.where(
             df['violation_status'].str.contains('-'),
             df['violation_status'],
@@ -97,15 +106,15 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Outp
     )).str.split('-', n=1, expand=True)
 
     df[['violation',
-        'sub-violation',
+        'sub_violation',
         'violation_status',
-        'sub-violation_status']] = df[['violation',
-                                       'sub-violation',
+        'sub_violation_status']] = df[['violation',
+                                       'sub_violation',
                                        'violation_status',
-                                       'sub-violation_status']].astype(dtype='string[pyarrow]')
+                                       'sub_violation_status']].astype(dtype='string[pyarrow]')
 
     return Output(
-        df,
+        df.astype(dtype=raw_column_dtypes),
         metadata={
             "num_records": len(df),
             "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
@@ -130,4 +139,52 @@ def fill_empty_values(split_violation_categories: pd.DataFrame,
             "empty_values_per_column": MetadataValue.md((df.isna().sum().to_markdown())),
             "preview": MetadataValue.md(df.head().to_markdown()),
         }
+    )
+
+
+@asset
+def setup_dwh(clickhouse_client: ResourceParam[ClickhouseClient]) -> None:
+    clickhouse_client.command("CREATE DATABASE IF NOT EXISTS nyc_data")
+
+    clickhouse_client.command(
+        """CREATE TABLE IF NOT EXISTS nyc_data.camera_violations
+        (
+        plate String,
+        state LowCardinality(String),
+        license_type LowCardinality(String),
+        summons_number String,
+        issue_date Date,
+        violation LowCardinality(String),
+        sub_violation LowCardinality(String),
+        violation_time String,
+        fine_amount Float32,
+        penalty_amount Float32,
+        interest_amount Float32,
+        reduction_amount Float32,
+        payment_amount Float32,
+        amount_due Float32,
+        precinct LowCardinality(String),
+        county LowCardinality(String),
+        issuing_agency LowCardinality(String),
+        violation_status LowCardinality(String),
+        sub_violation_status LowCardinality(String),
+        summons_image String,
+        judgment_entry_date Date
+        )
+        ENGINE=MergeTree
+        PARTITION BY toYYYYMM(issue_date) 
+        ORDER BY (violation, issue_date);"""
+    )
+
+
+@asset(deps=[setup_dwh])
+def load_to_dwh(fill_empty_values: CleanedCameraViolationsDataframe,
+                clickhouse_client: ResourceParam[ClickhouseClient]
+                ) -> None:
+    _ = setup_dwh
+
+    clickhouse_client.insert_df(
+        df=fill_empty_values,
+        database="nyc_data",
+        table="camera_violations"
     )

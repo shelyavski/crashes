@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import clickhouse_connect
 
 from sodapy import Socrata
 from dotenv import load_dotenv
@@ -14,9 +15,15 @@ socrata_client = Socrata(
     password=os.environ.get("SOCRATA_PASS")
 )
 
+clickhouse_client = clickhouse_connect.get_client(
+    host="localhost",
+    port=8123,
+    username=os.environ.get("CLICKHOUSE_U_NAME"),
+    password=os.environ.get("CLICKHOUSE_PASS")
+)
 
 # DATAFRAME VALIDATION RESOURCES
-raw_column_dtypes = {
+column_dtypes = {
     'plate': 'string[pyarrow]',
     'state': 'string[pyarrow]',
     'license_type': 'string[pyarrow]',
@@ -65,6 +72,6 @@ default_column_values = {
     'violation_status': default_type_values['category'],
     'summons_image': default_type_values['category'],
     'judgment_entry_date': default_type_values['date'],
-    'sub-violation': default_type_values['category'],
-    'sub-violation_status': default_type_values['category'],
+    'sub_violation': default_type_values['category'],
+    'sub_violation_status': default_type_values['category'],
 }

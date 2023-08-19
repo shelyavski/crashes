@@ -4,6 +4,7 @@ pandas
 sodapy
 python-dotenv
 pyarrow
+clickhouse-connect
 
 [dev]
 dagster-webserver

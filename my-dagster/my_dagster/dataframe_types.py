@@ -100,11 +100,11 @@ cleaned_camera_violations_columns: list[PandasColumn] = [
         **date_constraints
     ),
     PandasColumn.string_column(
-        'sub-violation_status',
+        'sub_violation_status',
         **string_constraints
     ),
     PandasColumn.string_column(
-        'sub-violation',
+        'sub_violation',
         **string_constraints
     ),
 ]
