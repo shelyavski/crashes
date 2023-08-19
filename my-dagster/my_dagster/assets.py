@@ -11,8 +11,7 @@ from dagster import (
     asset,
 )
 
-
-# TODO: Add custom validation types: https://docs.dagster.io/integrations/pandas
+from .dataframe_types import CleanedCameraViolationsDataframe
 
 
 @asset(retry_policy=RetryPolicy(
@@ -118,7 +117,7 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame) -> Outp
 @asset
 def fill_empty_values(split_violation_categories: pd.DataFrame,
                       default_column_values: ResourceParam[dict],
-                      ) -> Output[pd.DataFrame]:
+                      ) -> Output[CleanedCameraViolationsDataframe]:
     df = split_violation_categories
 
     for column in df.columns:
