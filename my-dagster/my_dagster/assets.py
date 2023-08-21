@@ -1,6 +1,6 @@
-import clickhouse_connect.driver.httpclient
 import pandas as pd
 import numpy as np
+import sql_variables
 
 from datetime import date, timedelta
 from sodapy import Socrata
@@ -144,7 +144,8 @@ def fill_empty_values(split_violation_categories: pd.DataFrame,
 
 @asset
 def setup_dwh(clickhouse_client: ResourceParam[ClickhouseClient]) -> None:
-    clickhouse_client.command("CREATE DATABASE IF NOT EXISTS nyc_data")
+    clickhouse_client.command(sql_variables.create_nyc_data_database)
+    clickhouse_client.command(sql_variables.create_camera_violations_table)
 
     clickhouse_client.command(
         """CREATE TABLE IF NOT EXISTS nyc_data.camera_violations
