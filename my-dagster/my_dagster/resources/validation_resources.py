@@ -1,21 +1,6 @@
-import os
 import numpy as np
 
-from sodapy import Socrata
-from dotenv import load_dotenv
-
-load_dotenv(dotenv_path='.env')
-
-# CLIENT RESOURCES
-socrata_client = Socrata(
-    domain="data.cityofnewyork.us",
-    app_token=os.environ.get("SOCRATA_APP_TOKEN"),
-    username=os.environ.get("SOCRATA_U_NAME"),
-    password=os.environ.get("SOCRATA_PASS")
-)
-
-
-# DATAFRAME VALIDATION RESOURCES
+# ------------ DATAFRAME VALIDATION RESOURCES ------------
 raw_column_dtypes = {
     'plate': 'string[pyarrow]',
     'state': 'string[pyarrow]',
@@ -37,6 +22,14 @@ raw_column_dtypes = {
     'summons_image': 'string[pyarrow]',
     'judgment_entry_date': 'datetime64[ns]'
 }
+
+violation_time_dtypes = {
+    'violation_hour': 'Int8',
+    'violation_minute': 'Int8',
+}
+
+staging_column_dtypes = raw_column_dtypes | violation_time_dtypes
+staging_column_dtypes.pop('violation_time')
 
 default_type_values = {
     'category': 'Not specified',
@@ -65,6 +58,6 @@ default_column_values = {
     'violation_status': default_type_values['category'],
     'summons_image': default_type_values['category'],
     'judgment_entry_date': default_type_values['date'],
-    'sub-violation': default_type_values['category'],
-    'sub-violation_status': default_type_values['category'],
+    'sub_violation': default_type_values['category'],
+    'sub_violation_status': default_type_values['category'],
 }

@@ -10,6 +10,7 @@ setup(
         "sodapy",
         "python-dotenv",
         "pyarrow",
+        "clickhouse-connect"
     ],
     extras_require={"dev": ["dagster-webserver", "pytest"]},
 )

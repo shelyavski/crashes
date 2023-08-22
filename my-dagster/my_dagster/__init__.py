@@ -1,27 +1,14 @@
-from dagster import (
-    Definitions,
-    AssetSelection,
-    ScheduleDefinition,
-    load_assets_from_modules,
-    define_asset_job,
-)
+from dagster import Definitions
 
-from . import assets, resources
+from .resources import resources
+from .jobs import parking_violations_schedule
+from .assets import extract_assets, transform_assets, load_assets
 
-all_assets = load_assets_from_modules([assets])
-
-parking_violations_job = define_asset_job("parking_violations_job", selection=AssetSelection.all())
-parking_violations_schedule = ScheduleDefinition(
-    job=parking_violations_job,
-    cron_schedule="0 15 * * *",
-)
+etl_assets = [*extract_assets, *transform_assets, *load_assets]
 
 defs = Definitions(
-    assets=all_assets,
+    assets=etl_assets,
     schedules=[parking_violations_schedule],
-    resources={
-        "socrata_client": resources.socrata_client,
-        "raw_column_dtypes": resources.raw_column_dtypes,
-        "default_column_values": resources.default_column_values,
-    },
+    resources=resources
 )
+

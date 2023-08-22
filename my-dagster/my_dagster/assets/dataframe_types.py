@@ -13,6 +13,20 @@ float_constraints = {
     'is_required': True
 }
 
+hour_constraints = {
+    'min_value': 0,
+    'max_value': 23,
+    'non_nullable': True,
+    'is_required': True
+}
+
+minute_constraints = {
+    'min_value': 0,
+    'max_value': 59,
+    'non_nullable': True,
+    'is_required': True
+}
+
 date_constraints = {
     'min_datetime': datetime.datetime(
         year=1970,
@@ -47,9 +61,13 @@ cleaned_camera_violations_columns: list[PandasColumn] = [
         'violation',
         **string_constraints
     ),
-    PandasColumn.string_column(
-        'violation_time',
-        **string_constraints
+    PandasColumn.integer_column(
+        'violation_hour',
+        **hour_constraints
+    ),
+    PandasColumn.integer_column(
+        'violation_minute',
+        **minute_constraints
     ),
     PandasColumn.float_column(
         'fine_amount',
@@ -100,11 +118,11 @@ cleaned_camera_violations_columns: list[PandasColumn] = [
         **date_constraints
     ),
     PandasColumn.string_column(
-        'sub-violation_status',
+        'sub_violation_status',
         **string_constraints
     ),
     PandasColumn.string_column(
-        'sub-violation',
+        'sub_violation',
         **string_constraints
     ),
 ]
