@@ -1,7 +1,7 @@
 import numpy as np
 
 # ------------ DATAFRAME VALIDATION RESOURCES ------------
-column_dtypes = {
+raw_column_dtypes = {
     'plate': 'string[pyarrow]',
     'state': 'string[pyarrow]',
     'license_type': 'string[pyarrow]',
@@ -22,6 +22,14 @@ column_dtypes = {
     'summons_image': 'string[pyarrow]',
     'judgment_entry_date': 'datetime64[ns]'
 }
+
+violation_time_dtypes = {
+    'violation_hour': 'Int8',
+    'violation_minute': 'Int8',
+}
+
+staging_column_dtypes = raw_column_dtypes | violation_time_dtypes
+staging_column_dtypes.pop('violation_time')
 
 default_type_values = {
     'category': 'Not specified',

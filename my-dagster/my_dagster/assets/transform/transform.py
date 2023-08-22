@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 
+from time import strptime
 from dagster import (
     MetadataValue,
     Output,
     ResourceParam,
     asset,
+    get_dagster_logger
 )
 
 from .. import dataframe_types
@@ -14,14 +16,14 @@ from .. import dataframe_types
 @asset(description="Add missing columns, if any.")
 def validate_columns_and_types(
         get_records_as_df: pd.DataFrame,
-        column_dtypes: ResourceParam[dict],
+        raw_column_dtypes: ResourceParam[dict],
         default_column_values: ResourceParam[dict],
 ) -> Output[pd.DataFrame]:
     df = get_records_as_df
 
     # Check if all columns are
     actual_columns = df.columns.values.tolist()
-    missing_columns = [col_name for col_name in column_dtypes.keys() if col_name not in actual_columns]
+    missing_columns = [col_name for col_name in raw_column_dtypes.keys() if col_name not in actual_columns]
 
     # Add missing columns and fill with default value
     if missing_columns:
@@ -40,8 +42,7 @@ def validate_columns_and_types(
 
 
 @asset(description="Split violation & violation_status into sub_categories for easier analytics")
-def split_violation_categories(validate_columns_and_types: pd.DataFrame,
-                               column_dtypes: ResourceParam[dict]
+def split_violation_categories(validate_columns_and_types: pd.DataFrame
                                ) -> Output[pd.DataFrame]:
     df = validate_columns_and_types
     df[['violation', 'violation_status']].fillna("Not specified")
@@ -73,7 +74,30 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame,
                                        'sub_violation_status']].astype(dtype='string[pyarrow]')
 
     return Output(
-        df.astype(dtype=column_dtypes),
+        df,
+        metadata={
+            "num_records": len(df),
+            "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
+            "preview": MetadataValue.md(df.head().to_markdown()),
+        }
+    )
+
+
+@asset
+def split_violation_time(split_violation_categories: pd.DataFrame,
+                         staging_column_dtypes: ResourceParam[dict]
+                         ) -> Output[pd.DataFrame]:
+    logger = get_dagster_logger()
+    df = split_violation_categories
+
+    df['violation_time'] = df['violation_time'] + 'M'  # So that we get AM and PM instead of A and P
+
+    df['violation_hour']  = df['violation_time'].apply(lambda x: strptime(x, "%I:%M%p").tm_hour)
+    df['violation_minute'] = df['violation_time'].apply(lambda x: strptime(x, "%I:%M%p").tm_min)
+    df = df.drop(columns=['violation_time'])
+
+    return Output(
+        df.astype(dtype=staging_column_dtypes),
         metadata={
             "num_records": len(df),
             "dtypes": MetadataValue.md((df.dtypes.to_markdown())),
@@ -83,12 +107,12 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame,
 
 
 @asset(description="Fill empty cells with their corresponding default values.")
-def fill_empty_values(split_violation_categories: pd.DataFrame,
+def fill_empty_values(split_violation_time: pd.DataFrame,
                       default_column_values: ResourceParam[dict],
                       ) -> Output[dataframe_types.CleanedCameraViolationsDataframe]:
-    df = split_violation_categories
-
-    for column in df.columns:
+    df = split_violation_time
+    cols_with_empty_values = df.columns[df.isnull().any()].tolist()
+    for column in cols_with_empty_values:
         df[column] = df[column].fillna(default_column_values[column])
 
     return Output(

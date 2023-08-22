@@ -32,8 +32,6 @@ def get_records_as_df(socrata_client: ResourceParam[Socrata]) -> Output[pd.DataF
     # Transform to data frame
     df = pd.DataFrame.from_records(data=records)
 
-    df['violation_time'] = df['violation_time'] + 'M'  # So that we get AM and PM instead of A and P
-
     return Output(
         df,
         metadata={
