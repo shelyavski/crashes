@@ -7,7 +7,6 @@ from dagster import (
     Output,
     ResourceParam,
     asset,
-    get_dagster_logger
 )
 
 from .. import dataframe_types
@@ -87,13 +86,12 @@ def split_violation_categories(validate_columns_and_types: pd.DataFrame
 def split_violation_time(split_violation_categories: pd.DataFrame,
                          staging_column_dtypes: ResourceParam[dict]
                          ) -> Output[pd.DataFrame]:
-    logger = get_dagster_logger()
     df = split_violation_categories
 
     df['violation_time'] = df['violation_time'] + 'M'  # So that we get AM and PM instead of A and P
 
-    df['violation_hour']  = df['violation_time'].apply(lambda x: strptime(x, "%I:%M%p").tm_hour)
-    df['violation_minute'] = df['violation_time'].apply(lambda x: strptime(x, "%I:%M%p").tm_min)
+    df['violation_hour'] = df['violation_time'].apply(lambda x: strptime(x, "%H:%M%p").tm_hour)
+    df['violation_minute'] = df['violation_time'].apply(lambda x: strptime(x, "%H:%M%p").tm_min)
     df = df.drop(columns=['violation_time'])
 
     return Output(

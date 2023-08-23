@@ -13,18 +13,19 @@ from dagster import (
 
 @asset(description="Retrieve last week's camera & parking violations",
        retry_policy=RetryPolicy(
-           max_retries=1,  # TODO: Change retries and delay once finished testing
-           delay=15)
+           max_retries=3,
+           delay=5)
        )
 def get_records_as_df(socrata_client: ResourceParam[Socrata]) -> Output[pd.DataFrame]:
-    yesterday = (date.today() - timedelta(days=1)).strftime("%m/%d/%Y")
+    today = date.today().strftime("%m/%d/%Y")
+    a_week_ago = (date.today() - timedelta(days=8)).strftime("%m/%d/%Y")
 
     # Query the API
     try:
         records = socrata_client.get(
             dataset_identifier="nc67-uf89",
-            where=f"issue_date = '{yesterday}'",
-            limit=5  # TODO: Change limit once finished testing
+            where=f"issue_date >= '{a_week_ago}' AND issue_date < '{today}'",
+            limit=999_999_999
         )
     except ConnectionError:
         raise ConnectionError
