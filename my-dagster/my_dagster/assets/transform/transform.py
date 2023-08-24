@@ -29,6 +29,12 @@ def validate_columns_and_types(
         for col_name in missing_columns:
             df[col_name] = df.apply(lambda _: default_column_values[col_name], axis=1)
 
+    # Fill empty cells with default values
+    cols_with_empty_values = df.columns[df.isnull().any()].tolist()
+    for column in cols_with_empty_values:
+        df[column] = df[column].fillna(default_column_values[column])
+
+    df = df.astype(dtype=raw_column_dtypes)
     # Return with correct dtypes
     return Output(
         df,
