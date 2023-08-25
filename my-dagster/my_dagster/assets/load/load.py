@@ -17,11 +17,11 @@ def setup_dwh(clickhouse_client: ResourceParam[ClickhouseClient],
 
 @asset(description="Load the final DataFrame in Clickhouse",
        deps=[setup_dwh])
-def load_to_dwh(fill_empty_values: dataframe_types.CleanedCameraViolationsDataframe,
+def load_to_dwh(merge_dfs: dataframe_types.CleanedCameraViolationsDataframe,
                 clickhouse_client: ResourceParam[ClickhouseClient]
                 ) -> None:
     clickhouse_client.insert_df(
-        df=fill_empty_values,
+        df=merge_dfs,
         database="nyc_data",
         table="camera_violations"
     )

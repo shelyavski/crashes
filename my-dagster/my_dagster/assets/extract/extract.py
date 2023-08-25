@@ -19,13 +19,14 @@ from dagster import (
 def get_records_as_df(socrata_client: ResourceParam[Socrata]) -> Output[pd.DataFrame]:
     today = date.today().strftime("%m/%d/%Y")
     a_week_ago = (date.today() - timedelta(days=8)).strftime("%m/%d/%Y")
+    filter_query = f"issue_date >= '{a_week_ago}' AND issue_date < '{today}'"
 
     # Query the API
     try:
         records = socrata_client.get(
             dataset_identifier="nc67-uf89",
-            where=f"issue_date >= '{a_week_ago}' AND issue_date < '{today}'",
-            limit=999_999_999
+            where=filter_query,
+            limit=100_000_000
         )
     except ConnectionError:
         raise ConnectionError

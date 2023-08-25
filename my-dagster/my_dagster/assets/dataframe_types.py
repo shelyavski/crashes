@@ -16,15 +16,13 @@ float_constraints = {
 hour_constraints = {
     'min_value': 0,
     'max_value': 23,
-    'non_nullable': True,
-    'is_required': True
+    'non_nullable': False,
 }
 
 minute_constraints = {
     'min_value': 0,
     'max_value': 59,
-    'non_nullable': True,
-    'is_required': True
+    'non_nullable': False,
 }
 
 date_constraints = {
